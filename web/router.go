@@ -1,4 +1,4 @@
-package framework
+package web
 
 import (
 	"fmt"
@@ -7,12 +7,13 @@ import (
 
 // 用来支持路由树的操作
 // 代表路由树（森林）
-type Router struct {
+type router struct {
 	//一个方法对应一棵树
 	trees map[string]*node
 }
 type node struct {
-	path string
+	route string
+	path  string
 	//静态节点
 	//子 path 到子节点的映射
 	children map[string]*node
@@ -29,15 +30,15 @@ type matchInfo struct {
 	pathParams map[string]string
 }
 
-func NewRouter() Router {
-	return Router{
+func NewRouter() router {
+	return router{
 		trees: map[string]*node{},
 	}
 }
 
 // addRoute 用来注册路由,提供handleFunc
 // addRoute 为私有方法，可以避免用户传入一个错误的http方法
-func (r *Router) addRoute(method string, path string, handleFunc HandleFunc) {
+func (r *router) addRoute(method string, path string, handleFunc HandleFunc) {
 	//进行一些限制：
 	if path == "" {
 		panic("web 路径不能为空字符串")
@@ -63,6 +64,7 @@ func (r *Router) addRoute(method string, path string, handleFunc HandleFunc) {
 			panic("重复注册根节点/")
 		}
 		root.handler = handleFunc
+		root.route = "/"
 		return
 	}
 
@@ -83,6 +85,7 @@ func (r *Router) addRoute(method string, path string, handleFunc HandleFunc) {
 		panic(fmt.Sprintf("路由冲突，重复注册，path[%s]", path))
 	}
 	root.handler = handleFunc
+	root.route = path
 }
 
 // 查看一个子节点,没有则创建一个传入children中
@@ -121,7 +124,7 @@ func (n *node) childrenOrCreat(seg string) *node {
 	return res
 }
 
-func (r *Router) findRoute(method string, path string) (*matchInfo, bool) {
+func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 	root, ok := r.trees[method]
 	if !ok {
 		return nil, false

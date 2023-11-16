@@ -1,6 +1,7 @@
-package framework
+package web
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 )
@@ -20,17 +21,33 @@ type Server interface {
 	//handleFunc是业务逻辑
 	addRoute(method string, path string, handleFunc HandleFunc)
 }
+type HTTPServerOption func(server *HTTPServer)
+
 type HTTPServer struct {
-	//*Router
-	Router
+	//*router
+	router
+	middlewares []MiddleWare
+	log         func(message string, arg ...any)
 }
 
 // 用户可能不会使用NwHTTPServer,而是自己s := &HTTPServer{},会引起panic
-func NewHTTPServer() HTTPServer {
-	return HTTPServer{
-		Router: NewRouter(),
+func NewHTTPServer(opts ...HTTPServerOption) *HTTPServer {
+	res := &HTTPServer{
+		router: NewRouter(),
+		log: func(message string, arg ...any) {
+			fmt.Printf(message, arg...)
+		},
 	}
+	for _, opt := range opts {
+		opt(res)
+	}
+	return res
 
+}
+func ServerWithMiddleware(meddlewares ...MiddleWare) HTTPServerOption {
+	return func(server *HTTPServer) {
+		server.middlewares = meddlewares
+	}
 }
 
 // 处理请求的入口：
@@ -39,21 +56,51 @@ func (h *HTTPServer) ServeHTTP(writer http.ResponseWriter, request *http.Request
 		Resp: writer,
 		Req:  request,
 	}
-	//接下来就是查找路由，并且执行命中的路由
-	h.Serve(ctx)
+	//这是最后一个
+	root := h.Serve
+	//然后这里就是利用最后一个不断向前回溯组装链条
+	//然后向前，把后一个作为前一个的next 构造好链条
+	for i := len(h.middlewares) - 1; i >= 0; i-- {
+		root = h.middlewares[i](root)
+	}
+	//这里最后一个步骤，就是把 RespData 和 RespStatusCode 刷新到响应里面
+	var m MiddleWare = func(next HandleFunc) HandleFunc {
+		return func(ctx *Context) {
+			//就设置好了 RespData 和RespStatusCode
+			next(ctx)
+			h.flashResp(ctx)
+		}
+	}
+	root = m(root)
+	root(ctx)
 }
+
+func (h *HTTPServer) flashResp(ctx *Context) {
+	if ctx.RespStatusCode != 0 {
+		ctx.Resp.WriteHeader(ctx.RespStatusCode)
+	}
+	n, err := ctx.Resp.Write(ctx.RespData)
+	if err != nil || n != len(ctx.RespData) {
+		h.log("写入响应失败 %v", err)
+	}
+}
+
 func (h *HTTPServer) Serve(ctx *Context) {
 	//接下来就是查找路由，并且执行命中的路由
 	match, ok := h.findRoute(ctx.Req.Method, ctx.Req.URL.Path)
 	//如果路由未命中，或者没有业务逻辑（handler），则为404
 	if !ok || match.n.handler == nil {
-		ctx.Resp.WriteHeader(404)
-		_, _ = ctx.Resp.Write([]byte("NOT FOUND"))
+		ctx.RespStatusCode = 404
+		ctx.RespData = []byte("NOT FOUND")
 		return
 	}
 	ctx.PathParams = match.pathParams
+	ctx.MatchedRoute = match.n.route
 	match.n.handler(ctx)
 }
+
+// Start 启动服务器，用户指定端口
+// 这种就是编程接口
 func (h *HTTPServer) Start(add string) error {
 	listener, err := net.Listen("tcp", add)
 	if err != nil {

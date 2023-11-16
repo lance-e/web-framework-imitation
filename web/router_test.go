@@ -1,4 +1,4 @@
-package framework
+package web
 
 import (
 	"fmt"
@@ -58,7 +58,7 @@ func TestRouter_AddRoute(t *testing.T) {
 		r.addRoute(route.Method, route.Path, mockHandleFunc)
 	}
 	//断言路由树与你预期的路由树一样
-	wantRoute := &Router{
+	wantRoute := &router{
 		trees: map[string]*node{
 			http.MethodGet: &node{
 				path:    "/",
@@ -152,7 +152,7 @@ func TestRouter_AddRoute(t *testing.T) {
 
 }
 
-func (r *Router) equal(y *Router) (string, bool) {
+func (r *router) equal(y *router) (string, bool) {
 	for i, v := range r.trees {
 		dst, ok := y.trees[i]
 		if !ok {
