@@ -68,3 +68,18 @@ PostForm：PATCH，POST，PUT body参数，在编码是x-www-form-urlencoded的�
 
 集成可观测性框架：利用middleware机制
 
+### Session ：
+
+Session 是一种在服务端维护用户状态的机制
+
+Cookie和Session：两者都可以看做是维护用户状态的机制，Cookie在客户端，Session是服务端
+
+Session的实现：构建出Session和Store 两个抽象，其他随意
+
+Session id的生成：简单的像UUID，复杂的就是加密算法
+
+Session id 中放入数据编码：可以减轻存储Session的压力，比如Redis。直接解码拿到数据就可以不需要再访问Redis了
+
+Session id载体：Cookie，HTTP Header，HTTP URL
+
+Session id 放Cookie的缺点：安全性

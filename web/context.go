@@ -25,6 +25,8 @@ type Context struct {
 	queryValues url.Values //缓存的数据
 
 	MatchedRoute string //命中的路由
+
+	UserValue map[string]any
 }
 
 type StringValue struct {
